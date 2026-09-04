@@ -167,16 +167,23 @@ export function buildDynamicMessages(
  * Recursively walks through an object and replaces variable placeholders.
  * @param node The object or value to process.
  * @param variables A key-value map of variables to replace.
+ * @param caseInsensitive Match placeholders regardless of case. Needed for
+ * URLs because the curl parser normalizes hostnames to lowercase
+ * (e.g. `{{HOST}}` becomes `{{host}}`), while variable keys are uppercase.
  * @returns The processed object.
  */
 export function deepVariableReplacer(
   node: any,
-  variables: Record<string, string>
+  variables: Record<string, string>,
+  caseInsensitive = false
 ): any {
   if (typeof node === "string") {
     let result = node;
     for (const [key, value] of Object.entries(variables)) {
-      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value);
+      result = result.replace(
+        new RegExp(`\\{\\{${key}\\}\\}`, caseInsensitive ? "gi" : "g"),
+        value
+      );
     }
     return result;
   }

@@ -273,7 +273,8 @@ export async function* fetchAIResponse(params: {
     };
 
     bodyObj = deepVariableReplacer(bodyObj, allVariables);
-    let url = deepVariableReplacer(curlJson.url || "", allVariables);
+    // Case-insensitive: the curl parser lowercases hostnames in URLs.
+    let url = deepVariableReplacer(curlJson.url || "", allVariables, true);
 
     const headers = deepVariableReplacer(curlJson.header || {}, allVariables);
     headers["Content-Type"] = "application/json";

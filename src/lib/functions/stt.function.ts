@@ -95,7 +95,8 @@ export async function fetchSTT(params: STTParams): Promise<string> {
     };
 
     // Prepare request
-    let url = deepVariableReplacer(curlJson.url || "", allVariables);
+    // Case-insensitive URL replace: the curl parser lowercases hostnames.
+    let url = deepVariableReplacer(curlJson.url || "", allVariables, true);
     const headers = deepVariableReplacer(curlJson.header || {}, allVariables);
     const formData = deepVariableReplacer(curlJson.form || {}, allVariables);
 
