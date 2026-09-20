@@ -37,14 +37,19 @@ pub struct LicenseState {
 impl Default for LicenseState {
     fn default() -> Self {
         LicenseState {
-            has_active_license: AtomicBool::new(false),
+            // Local build: start unlocked so shortcut registration at startup
+            // isn't skipped before the frontend syncs its state down.
+            has_active_license: AtomicBool::new(true),
         }
     }
 }
 
 impl LicenseState {
     pub fn is_active(&self) -> bool {
-        self.has_active_license.load(Ordering::Relaxed)
+        // Local build: all features unlocked. The stored flag is still kept in
+        // sync by set_active() so the rest of the plumbing behaves normally.
+        let _ = self.has_active_license.load(Ordering::Relaxed);
+        true
     }
 
     pub fn set_active(&self, active: bool) {

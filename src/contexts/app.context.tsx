@@ -149,15 +149,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const getActiveLicenseStatus = async () => {
-    const response: { is_active: boolean; is_dev_license: boolean } =
-      await invoke("validate_license_api");
-    setHasActiveLicense(response.is_active);
+    // Local build: every client-side feature gate is unlocked. We still call
+    // the validator so the hosted-API bits keep whatever state they need, but
+    // a failure here must never lock the UI.
+    let response: { is_active: boolean; is_dev_license: boolean } = {
+      is_active: false,
+      is_dev_license: false,
+    };
+
+    try {
+      response = await invoke("validate_license_api");
+    } catch {
+      // No license server / no key configured - stay unlocked.
+    }
+
+    setHasActiveLicense(true);
 
     if (response?.is_dev_license) {
       setPluelyApiEnabled(false);
     }
 
-    // Check if the auto configs are enabled
+    // Check if the auto configs are enabled. Keyed on the real license status
+    // on purpose - this is a first-run default, not a feature gate.
     const autoConfigsEnabled = localStorage.getItem("auto-configs-enabled");
     if (response.is_active && !autoConfigsEnabled) {
       setScreenshotConfiguration({
