@@ -94,6 +94,19 @@ export const useCompletion = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const currentRequestIdRef = useRef<string | null>(null);
 
+  // Refs mirror state so async streaming/saving never uses a stale closure.
+  // submit() reads history from the ref; save updates ref + state together.
+  const conversationHistoryRef = useRef<ChatMessage[]>([]);
+  const currentConversationIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    conversationHistoryRef.current = state.conversationHistory;
+  }, [state.conversationHistory]);
+
+  useEffect(() => {
+    currentConversationIdRef.current = state.currentConversationId;
+  }, [state.currentConversationId]);
+
   const setInput = useCallback((value: string) => {
     setState((prev) => ({ ...prev, input: value }));
   }, []);
@@ -133,6 +146,92 @@ export const useCompletion = () => {
     setState((prev) => ({ ...prev, attachedFiles: [] }));
   }, []);
 
+  const saveCurrentConversation = useCallback(
+    async (
+      userMessage: string,
+      assistantResponse: string,
+      _attachedFiles: AttachedFile[]
+    ) => {
+      // Validate inputs
+      if (!userMessage || !assistantResponse) {
+        console.error("Cannot save conversation: missing message content");
+        return;
+      }
+
+      // Read from refs so rapid follow-ups ("example??") never lose turns
+      // to a stale closure capturing an older history array.
+      const prevHistory = conversationHistoryRef.current;
+      const prevConversationId = currentConversationIdRef.current;
+      const conversationId =
+        prevConversationId || generateConversationId("chat");
+      const timestamp = Date.now();
+
+      const userMsg: ChatMessage = {
+        id: generateMessageId("user", timestamp),
+        role: "user",
+        content: userMessage,
+        timestamp,
+      };
+
+      const assistantMsg: ChatMessage = {
+        id: generateMessageId("assistant", timestamp + MESSAGE_ID_OFFSET),
+        role: "assistant",
+        content: assistantResponse,
+        timestamp: timestamp + MESSAGE_ID_OFFSET,
+      };
+
+      const newMessages = [...prevHistory, userMsg, assistantMsg];
+
+      // Update in-memory history FIRST so the next question always has
+      // context even if the DB write below fails. Previously the state
+      // update only happened after a successful save, so a DB failure
+      // meant every request went out with history=[] (stateless).
+      conversationHistoryRef.current = newMessages;
+      currentConversationIdRef.current = conversationId;
+      setState((prev) => ({
+        ...prev,
+        currentConversationId: conversationId,
+        conversationHistory: newMessages,
+      }));
+
+      // Get existing conversation if updating
+      let existingConversation = null;
+      if (prevConversationId) {
+        try {
+          existingConversation = await getConversationById(prevConversationId);
+        } catch (error) {
+          console.error("Failed to get existing conversation:", error);
+        }
+      }
+
+      const title =
+        prevHistory.length === 0
+          ? generateConversationTitle(userMessage)
+          : existingConversation?.title ||
+            generateConversationTitle(userMessage);
+
+      const conversation: ChatConversation = {
+        id: conversationId,
+        title,
+        messages: newMessages,
+        createdAt: existingConversation?.createdAt || timestamp,
+        updatedAt: timestamp,
+      };
+
+      try {
+        await saveConversation(conversation);
+      } catch (error) {
+        console.error("Failed to save conversation:", error);
+        // Keep in-memory history; only surface the error.
+        setState((prev) => ({
+          ...prev,
+          error: "Failed to save conversation. Please try again.",
+        }));
+      }
+    },
+    []
+  );
+
   const submit = useCallback(
     async (speechText?: string) => {
       const input = speechText || state.input;
@@ -161,11 +260,16 @@ export const useCompletion = () => {
       const signal = abortControllerRef.current.signal;
 
       try {
-        // Prepare message history for the AI
-        const messageHistory = state.conversationHistory.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        }));
+        // Prepare message history for the AI (from ref: always current,
+        // even if submit/save closures are stale). Sorted oldest-first on a
+        // COPY: the server pairs consecutive user/assistant turns, so wire
+        // order must be chronological. Never sort the state array in place.
+        const messageHistory = [...conversationHistoryRef.current]
+          .sort((a, b) => a.timestamp - b.timestamp)
+          .map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          }));
 
         // Handle image attachments
         const imagesBase64: string[] = [];
@@ -290,7 +394,7 @@ export const useCompletion = () => {
       selectedAIProvider,
       allAiProviders,
       systemPrompt,
-      state.conversationHistory,
+      saveCurrentConversation,
     ]
   );
 
@@ -335,6 +439,8 @@ export const useCompletion = () => {
   // are now imported from lib/database/chat-history.action.ts
 
   const loadConversation = useCallback((conversation: ChatConversation) => {
+    conversationHistoryRef.current = conversation.messages;
+    currentConversationIdRef.current = conversation.id;
     setState((prev) => ({
       ...prev,
       currentConversationId: conversation.id,
@@ -347,6 +453,8 @@ export const useCompletion = () => {
   }, []);
 
   const startNewConversation = useCallback(() => {
+    conversationHistoryRef.current = [];
+    currentConversationIdRef.current = null;
     setState((prev) => ({
       ...prev,
       currentConversationId: null,
@@ -358,84 +466,6 @@ export const useCompletion = () => {
       attachedFiles: [],
     }));
   }, []);
-
-  const saveCurrentConversation = useCallback(
-    async (
-      userMessage: string,
-      assistantResponse: string,
-      _attachedFiles: AttachedFile[]
-    ) => {
-      // Validate inputs
-      if (!userMessage || !assistantResponse) {
-        console.error("Cannot save conversation: missing message content");
-        return;
-      }
-
-      const conversationId =
-        state.currentConversationId || generateConversationId("chat");
-      const timestamp = Date.now();
-
-      const userMsg: ChatMessage = {
-        id: generateMessageId("user", timestamp),
-        role: "user",
-        content: userMessage,
-        timestamp,
-      };
-
-      const assistantMsg: ChatMessage = {
-        id: generateMessageId("assistant", timestamp + MESSAGE_ID_OFFSET),
-        role: "assistant",
-        content: assistantResponse,
-        timestamp: timestamp + MESSAGE_ID_OFFSET,
-      };
-
-      const newMessages = [...state.conversationHistory, userMsg, assistantMsg];
-
-      // Get existing conversation if updating
-      let existingConversation = null;
-      if (state.currentConversationId) {
-        try {
-          existingConversation = await getConversationById(
-            state.currentConversationId
-          );
-        } catch (error) {
-          console.error("Failed to get existing conversation:", error);
-        }
-      }
-
-      const title =
-        state.conversationHistory.length === 0
-          ? generateConversationTitle(userMessage)
-          : existingConversation?.title ||
-            generateConversationTitle(userMessage);
-
-      const conversation: ChatConversation = {
-        id: conversationId,
-        title,
-        messages: newMessages,
-        createdAt: existingConversation?.createdAt || timestamp,
-        updatedAt: timestamp,
-      };
-
-      try {
-        await saveConversation(conversation);
-
-        setState((prev) => ({
-          ...prev,
-          currentConversationId: conversationId,
-          conversationHistory: newMessages,
-        }));
-      } catch (error) {
-        console.error("Failed to save conversation:", error);
-        // Show error to user
-        setState((prev) => ({
-          ...prev,
-          error: "Failed to save conversation. Please try again.",
-        }));
-      }
-    },
-    [state.currentConversationId, state.conversationHistory]
-  );
 
   // Listen for conversation events from the main ChatHistory component
   useEffect(() => {
@@ -574,11 +604,14 @@ export const useCompletion = () => {
           const signal = abortControllerRef.current.signal;
 
           try {
-            // Prepare message history for the AI
-            const messageHistory = state.conversationHistory.map((msg) => ({
-              role: msg.role,
-              content: msg.content,
-            }));
+            // Prepare message history for the AI (from ref: always current).
+            // Sorted oldest-first on a COPY - never sort state in place.
+            const messageHistory = [...conversationHistoryRef.current]
+              .sort((a, b) => a.timestamp - b.timestamp)
+              .map((msg) => ({
+                role: msg.role,
+                content: msg.content,
+              }));
 
             let fullResponse = "";
 
@@ -700,7 +733,6 @@ export const useCompletion = () => {
     },
     [
       state.attachedFiles.length,
-      state.conversationHistory,
       selectedAIProvider,
       allAiProviders,
       systemPrompt,

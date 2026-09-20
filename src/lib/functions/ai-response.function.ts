@@ -65,11 +65,13 @@ async function* fetchPluelyAIResponse(params: {
       return;
     }
 
-    // Convert history to the expected format
+    // Convert history to the expected format.
+    // History is stored oldest-first everywhere (useCompletion,
+    // useChatCompletion) and the backend expects chronological order:
+    // [system], ...history, userMessage. Do NOT reverse.
     let historyString: string | undefined;
     if (history.length > 0) {
-      // Create a copy before reversing to avoid mutating the original array
-      const formattedHistory = [...history].reverse().map((msg) => ({
+      const formattedHistory = history.map((msg) => ({
         role: msg.role,
         content: [{ type: "text", text: msg.content }],
       }));
@@ -310,10 +312,11 @@ export async function* fetchAIResponse(params: {
       ) {
         return; // Silently return on abort
       }
-      yield `Network error during API request: ${
-        fetchError instanceof Error ? fetchError.message : "Unknown error"
-      }`;
-      return;
+      throw new Error(
+        `Network error during API request: ${
+          fetchError instanceof Error ? fetchError.message : "Unknown error"
+        }`
+      );
     }
 
     if (!response.ok) {
@@ -321,10 +324,11 @@ export async function* fetchAIResponse(params: {
       try {
         errorText = await response.text();
       } catch {}
-      yield `API request failed: ${response.status} ${response.statusText}${
-        errorText ? ` - ${errorText}` : ""
-      }`;
-      return;
+      throw new Error(
+        `API request failed: ${response.status} ${response.statusText}${
+          errorText ? ` - ${errorText}` : ""
+        }`
+      );
     }
 
     if (!provider?.streaming) {
@@ -332,10 +336,11 @@ export async function* fetchAIResponse(params: {
       try {
         json = await response.json();
       } catch (parseError) {
-        yield `Failed to parse non-streaming response: ${
-          parseError instanceof Error ? parseError.message : "Unknown error"
-        }`;
-        return;
+        throw new Error(
+          `Failed to parse non-streaming response: ${
+            parseError instanceof Error ? parseError.message : "Unknown error"
+          }`
+        );
       }
       const content =
         getByPath(json, provider?.responseContentPath || "") || "";
@@ -344,8 +349,7 @@ export async function* fetchAIResponse(params: {
     }
 
     if (!response.body) {
-      yield "Streaming not supported or response body missing";
-      return;
+      throw new Error("Streaming not supported or response body missing");
     }
 
     const reader = response.body.getReader();
@@ -370,10 +374,11 @@ export async function* fetchAIResponse(params: {
         ) {
           return; // Silently return on abort
         }
-        yield `Error reading stream: ${
-          readError instanceof Error ? readError.message : "Unknown error"
-        }`;
-        return;
+        throw new Error(
+          `Error reading stream: ${
+            readError instanceof Error ? readError.message : "Unknown error"
+          }`
+        );
       }
       const { done, value } = readResult;
       if (done) break;

@@ -158,11 +158,15 @@ export const useChatCompletion = (
       const signal = abortControllerRef.current.signal;
 
       try {
-        // Prepare message history for the AI
-        const messageHistory = (messages?.messages || []).map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        }));
+        // Prepare message history for the AI. Sorted oldest-first on a COPY:
+        // the server pairs consecutive user/assistant turns, so wire order
+        // must be chronological. Never sort the state array in place.
+        const messageHistory = [...(messages?.messages || [])]
+          .sort((a, b) => a.timestamp - b.timestamp)
+          .map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          }));
 
         // Handle image attachments
         const imagesBase64: string[] = [];
