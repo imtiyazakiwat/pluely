@@ -7,6 +7,7 @@ import { Button } from "@/components";
 import { useApp } from "@/contexts";
 import { floatArrayToWav } from "@/lib/utils";
 import { shouldUseClocksAPI } from "@/lib/functions/clocks.api";
+import { isLocalSttEnabled } from "@/lib/functions/local-stt.function";
 
 interface AutoSpeechVADProps {
   submit: UseCompletionReturn["submit"];
@@ -40,9 +41,11 @@ const AutoSpeechVADInternal = ({
 
         let transcription: string;
         const useClocksAPI = await shouldUseClocksAPI();
+        // fetchSTT transcribes on-device first when this is on.
+        const useLocalStt = isLocalSttEnabled();
 
         // Check if we have a configured speech provider
-        if (!selectedSttProvider.provider && !useClocksAPI) {
+        if (!selectedSttProvider.provider && !useClocksAPI && !useLocalStt) {
           console.warn("No speech provider selected");
           setState((prev: any) => ({
             ...prev,
@@ -56,7 +59,7 @@ const AutoSpeechVADInternal = ({
           (p) => p.id === selectedSttProvider.provider
         );
 
-        if (!providerConfig && !useClocksAPI) {
+        if (!providerConfig && !useClocksAPI && !useLocalStt) {
           console.warn("Selected speech provider configuration not found");
           setState((prev: any) => ({
             ...prev,

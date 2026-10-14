@@ -23,6 +23,8 @@ export const STORAGE_KEYS = {
   // Ask-gate decision log (local only, never transmitted). See src/lib/gate.
   GATE_DECISION_LOG: "gate_decision_log",
   GATE_LOG_SETTINGS: "gate_log_settings",
+  // On-device speech recognition (beta). See src/lib/functions/local-stt.function.ts.
+  LOCAL_STT_ENABLED: "local_stt_enabled",
 } as const;
 
 // Max number of files that can be attached to a message

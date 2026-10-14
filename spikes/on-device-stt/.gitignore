@@ -1,0 +1,3 @@
+# Downloaded models, audio test sets, the Python venv and raw benchmark output.
+.cache/
+__pycache__/
