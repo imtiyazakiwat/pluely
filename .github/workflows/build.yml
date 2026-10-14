@@ -1,0 +1,75 @@
+name: Build desktop app
+
+# Builds installers for macOS (Apple Silicon) and Windows (x64).
+# Runs on demand (Actions tab > Build desktop app > Run workflow) and on every
+# push to ci/tauri-build. It does not publish a release.
+on:
+  workflow_dispatch:
+  push:
+    branches: [ci/tauri-build]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS (Apple Silicon)
+            os: macos-latest
+            bundles: dmg
+            artifact_glob: src-tauri/target/release/bundle/dmg/*.dmg
+            rustflags: ""
+          - name: Windows (x64)
+            os: windows-latest
+            bundles: nsis
+            artifact_glob: src-tauri/target/release/bundle/nsis/*.exe
+            # sherpa-onnx publishes its Windows static libraries built with the
+            # static C runtime (/MT); link the app the same way.
+            rustflags: -C target-feature=+crt-static
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.os }}-${{ matrix.rustflags }}
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Build app
+        shell: bash
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
+        # Updater artifacts are signed with a private key that is not available
+        # to this repository, so they are switched off for CI builds.
+        run: >-
+          npx tauri build
+          --bundles ${{ matrix.bundles }}
+          --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: clocks-${{ runner.os }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+          retention-days: 14
