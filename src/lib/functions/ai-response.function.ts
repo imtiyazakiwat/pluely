@@ -276,13 +276,35 @@ export async function* fetchAIResponse(params: {
 
     bodyObj = deepVariableReplacer(bodyObj, allVariables);
     // Case-insensitive: the curl parser lowercases hostnames in URLs.
-    let url = deepVariableReplacer(curlJson.url || "", allVariables, true);
+    // Decode first: the parser percent-encodes {{placeholders}} in the path.
+    let url = deepVariableReplacer(
+      decodeURIComponent(curlJson.url || ""),
+      allVariables,
+      true
+    );
+
+    // Append query params (curl2Json splits them out of the URL)
+    const rawParams = curlJson.params || {};
+    const decodedParams = Object.fromEntries(
+      Object.entries(rawParams).map(([key, value]) => [
+        key,
+        typeof value === "string" ? decodeURIComponent(value) : "",
+      ])
+    );
+    const replacedParams = deepVariableReplacer(decodedParams, allVariables);
+    const queryString = new URLSearchParams(replacedParams).toString();
+    if (queryString) {
+      url += (url.includes("?") ? "&" : "?") + queryString;
+    }
 
     const headers = deepVariableReplacer(curlJson.header || {}, allVariables);
     headers["Content-Type"] = "application/json";
 
     if (provider?.streaming) {
-      if (typeof bodyObj === "object" && bodyObj !== null) {
+      // Native Google streamGenerateContent endpoints reject an unknown
+      // top-level "stream" field; they stream via the URL instead.
+      const isNativeGoogleStream = url?.toLowerCase().includes("streamgeneratecontent");
+      if (!isNativeGoogleStream && typeof bodyObj === "object" && bodyObj !== null) {
         const streamKey = Object.keys(bodyObj).find(
           (k) => k.toLowerCase() === "stream"
         );

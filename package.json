@@ -37,6 +37,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test:gate": "node --experimental-strip-types --test src/lib/gate/backchannel.test.ts src/lib/gate/log.test.ts",
     "preview": "vite preview",
     "tauri": "tauri"
   },

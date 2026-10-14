@@ -1,5 +1,31 @@
 export const AI_PROVIDERS = [
   {
+    id: "gemini-vertex",
+    curl: `curl -X POST "https://aiplatform.googleapis.com/v1/projects/patil-hospital-pos/locations/global/publishers/google/models/{{MODEL}}:streamGenerateContent?alt=sse" \\
+  -H "Authorization: Bearer {{API_KEY}}" \\
+  -H "X-Goog-User-Project: patil-hospital-pos" \\
+  -H "Content-Type: application/json; charset=utf-8" \\
+  -d '{
+    "systemInstruction": { "parts": [{ "text": "{{SYSTEM_PROMPT}}" }] },
+    "contents": [
+      {
+        "role": "user",
+        "parts": [
+          { "text": "{{TEXT}}" },
+          { "inlineData": { "mimeType": "image/png", "data": "{{IMAGE}}" } }
+        ]
+      }
+    ],
+    "generationConfig": {
+      "thinkingConfig": { "thinkingBudget": 0 },
+      "temperature": 0.2,
+      "maxOutputTokens": 1024
+    }
+  }'`,
+    responseContentPath: "candidates[0].content.parts[0].text",
+    streaming: true,
+  },
+  {
     id: "openai",
     curl: `curl https://api.openai.com/v1/chat/completions \\
   -H "Content-Type: application/json" \\

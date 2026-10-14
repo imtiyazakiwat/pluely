@@ -20,6 +20,9 @@ export const STORAGE_KEYS = {
   SELECTED_AUDIO_DEVICES: "selected_audio_devices",
   RESPONSE_SETTINGS: "response_settings",
   SUPPORTS_IMAGES: "supports_images",
+  // Ask-gate decision log (local only, never transmitted). See src/lib/gate.
+  GATE_DECISION_LOG: "gate_decision_log",
+  GATE_LOG_SETTINGS: "gate_log_settings",
 } as const;
 
 // Max number of files that can be attached to a message

@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useApp } from "@/contexts";
 import { fetchSTT, fetchAIResponse } from "@/lib/functions";
+import { shouldAsk, logGateDecision } from "@/lib/gate";
 import {
   DEFAULT_QUICK_ACTIONS,
   DEFAULT_SYSTEM_PROMPT,
@@ -272,7 +273,22 @@ export function useSystemAudio() {
                 timeoutPromise,
               ]);
 
-              if (transcription.trim()) {
+              // Ask-gate (layer 1): drop backchannels before they cost an LLM
+              // call. `isContinuousMode` is the MANUAL press-to-record mode
+              // (vadConfig.enabled === false), so the hands-free auto-detect
+              // mode is the one that needs the strict gate.
+              const gateInput = {
+                transcript: transcription,
+                mode: isContinuousMode
+                  ? ("explicit" as const)
+                  : ("continuous" as const),
+              };
+              const gate = shouldAsk(gateInput);
+              // Phase 2: every decision, asked or gated, goes in the log so
+              // the distribution can be read before any threshold is tuned.
+              logGateDecision(gate, gateInput);
+
+              if (gate.ask) {
                 setLastTranscription(transcription);
                 setError("");
 
@@ -289,8 +305,15 @@ export function useSystemAudio() {
                   effectiveSystemPrompt,
                   previousMessages
                 );
-              } else {
+              } else if (gate.reason === "empty") {
                 setError("Received empty transcription");
+              } else {
+                // Mirrors the `speech-discarded` listener above: expected
+                // behaviour, so log it rather than raising an error, but show
+                // what was heard so a wrongly-gated question is visible.
+                console.log("Ask gated:", gate.reason, transcription);
+                setLastTranscription(gate.status);
+                setError("");
               }
             } catch (sttError: any) {
               console.error("STT Error:", sttError);
@@ -318,6 +341,10 @@ export function useSystemAudio() {
     selectedSttProvider,
     allSttProviders,
     conversation.messages.length,
+    // Without this the listener closes over a stale mode when the user
+    // switches Auto-detect/Manual mid-session, and the gate picks the wrong
+    // strictness.
+    isContinuousMode,
   ]);
 
   // Context management functions
