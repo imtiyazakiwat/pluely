@@ -21,15 +21,15 @@ import { safeLocalStorage } from "@/lib";
 import { STORAGE_KEYS } from "@/config";
 import moment from "moment";
 
-interface PluelyPrompt {
+interface ClocksPrompt {
   title: string;
   prompt: string;
   modelId: string;
   modelName: string;
 }
 
-interface PluelyPromptsResponse {
-  prompts: PluelyPrompt[];
+interface ClocksPromptsResponse {
+  prompts: ClocksPrompt[];
   total: number;
   last_updated?: string;
 }
@@ -44,25 +44,25 @@ interface Model {
   isAvailable: boolean;
 }
 
-const SELECTED_PLUELY_MODEL_STORAGE_KEY = "selected_pluely_model";
-const SELECTED_PLUELY_PROMPT_STORAGE_KEY = "selected_pluely_prompt";
+const SELECTED_CLOCKS_MODEL_STORAGE_KEY = "selected_clocks_model";
+const SELECTED_CLOCKS_PROMPT_STORAGE_KEY = "selected_clocks_prompt";
 
-export const PluelyPrompts = () => {
+export const ClocksPrompts = () => {
   const {
     setSystemPrompt,
     hasActiveLicense,
     setSupportsImages,
-    pluelyApiEnabled,
+    clocksApiEnabled,
   } = useApp();
-  const [prompts, setPrompts] = useState<PluelyPrompt[]>([]);
+  const [prompts, setPrompts] = useState<ClocksPrompt[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [selectedPluelyPrompt, setSelectedPluelyPrompt] =
-    useState<PluelyPrompt | null>(() => {
+  const [selectedClocksPrompt, setSelectedClocksPrompt] =
+    useState<ClocksPrompt | null>(() => {
       // Load selected prompt from local storage on initial render
       const stored = safeLocalStorage.getItem(
-        SELECTED_PLUELY_PROMPT_STORAGE_KEY
+        SELECTED_CLOCKS_PROMPT_STORAGE_KEY
       );
       if (stored) {
         try {
@@ -79,20 +79,20 @@ export const PluelyPrompts = () => {
   useEffect(() => {
     if (!fetchInitiated.current) {
       fetchInitiated.current = true;
-      fetchPluelyPrompts();
+      fetchClocksPrompts();
       fetchModels();
     }
   }, []);
 
-  // Watch for changes in user's selected prompt and clear Pluely selection if needed
+  // Watch for changes in user's selected prompt and clear Clocks selection if needed
   useEffect(() => {
     const checkUserPromptSelection = () => {
       const userSelectedPromptId = safeLocalStorage.getItem(
         STORAGE_KEYS.SELECTED_SYSTEM_PROMPT_ID
       );
-      // If user has selected one of their own prompts, clear Pluely prompt selection
+      // If user has selected one of their own prompts, clear Clocks prompt selection
       if (userSelectedPromptId) {
-        setSelectedPluelyPrompt(null);
+        setSelectedClocksPrompt(null);
       }
     };
 
@@ -110,19 +110,19 @@ export const PluelyPrompts = () => {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
-  const fetchPluelyPrompts = async () => {
+  const fetchClocksPrompts = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await invoke<PluelyPromptsResponse>("fetch_prompts");
+      const response = await invoke<ClocksPromptsResponse>("fetch_prompts");
       setPrompts(response.prompts);
       if (response.last_updated) {
         setLastUpdated(response.last_updated);
       }
     } catch (err) {
-      console.error("Failed to fetch Pluely prompts:", err);
+      console.error("Failed to fetch Clocks prompts:", err);
       setError(
-        typeof err === "string" ? err : "Failed to fetch Pluely prompts"
+        typeof err === "string" ? err : "Failed to fetch Clocks prompts"
       );
     } finally {
       setIsLoading(false);
@@ -138,7 +138,7 @@ export const PluelyPrompts = () => {
     }
   };
 
-  const handleSelectPluelyPrompt = async (prompt: PluelyPrompt) => {
+  const handleSelectClocksPrompt = async (prompt: ClocksPrompt) => {
     // Check if user has active license
     if (!hasActiveLicense) {
       return;
@@ -147,7 +147,7 @@ export const PluelyPrompts = () => {
     try {
       // Set the system prompt
       setSystemPrompt(prompt.prompt);
-      setSelectedPluelyPrompt(prompt);
+      setSelectedClocksPrompt(prompt);
 
       // Clear the user's selected prompt ID from local storage
       // This ensures the user prompt cards don't show as selected
@@ -156,9 +156,9 @@ export const PluelyPrompts = () => {
       // Save the system prompt to local storage
       safeLocalStorage.setItem(STORAGE_KEYS.SYSTEM_PROMPT, prompt.prompt);
 
-      // Save the selected Pluely prompt to local storage for persistence
+      // Save the selected Clocks prompt to local storage for persistence
       safeLocalStorage.setItem(
-        SELECTED_PLUELY_PROMPT_STORAGE_KEY,
+        SELECTED_CLOCKS_PROMPT_STORAGE_KEY,
         JSON.stringify(prompt)
       );
 
@@ -169,7 +169,7 @@ export const PluelyPrompts = () => {
 
       if (matchingModel) {
         // Update supportsImages based on model modality
-        if (pluelyApiEnabled) {
+        if (clocksApiEnabled) {
           const hasImageSupport =
             matchingModel.modality?.includes("image") ?? false;
           setSupportsImages(hasImageSupport);
@@ -178,25 +178,25 @@ export const PluelyPrompts = () => {
         await invoke("secure_storage_save", {
           items: [
             {
-              key: SELECTED_PLUELY_MODEL_STORAGE_KEY,
+              key: SELECTED_CLOCKS_MODEL_STORAGE_KEY,
               value: JSON.stringify(matchingModel),
             },
           ],
         });
       }
     } catch (error) {
-      console.error("Failed to select Pluely prompt:", error);
+      console.error("Failed to select Clocks prompt:", error);
     }
   };
 
-  const handleCardClick = (prompt: PluelyPrompt) => {
-    handleSelectPluelyPrompt(prompt);
+  const handleCardClick = (prompt: ClocksPrompt) => {
+    handleSelectClocksPrompt(prompt);
   };
 
-  const isPromptSelected = (prompt: PluelyPrompt) => {
+  const isPromptSelected = (prompt: ClocksPrompt) => {
     return (
-      selectedPluelyPrompt?.title === prompt.title &&
-      selectedPluelyPrompt?.modelId === prompt.modelId
+      selectedClocksPrompt?.title === prompt.title &&
+      selectedClocksPrompt?.modelId === prompt.modelId
     );
   };
 
@@ -204,14 +204,14 @@ export const PluelyPrompts = () => {
     return (
       <div className="space-y-4 mt-6">
         <Header
-          title="Pluely Default Prompts"
+          title="Clocks Default Prompts"
           description="Pre-configured prompts with optimal model selection"
         />
         <Empty
           isLoading={true}
           icon={Sparkles}
           title="Loading prompts..."
-          description="Fetching Pluely default prompts"
+          description="Fetching Clocks default prompts"
         />
       </div>
     );
@@ -221,7 +221,7 @@ export const PluelyPrompts = () => {
     return (
       <div className="space-y-4 mt-6">
         <Header
-          title="Pluely Default Prompts"
+          title="Clocks Default Prompts"
           description="Pre-configured prompts with optimal model selection"
         />
         <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3">
@@ -241,7 +241,7 @@ export const PluelyPrompts = () => {
         <div className="flex items-start gap-3 w-full">
           <div className="flex flex-col gap-1 w-full">
             <Header
-              title="Pluely Default Prompts"
+              title="Clocks Default Prompts"
               description="Pre-configured prompts with optimal model pairings. Selecting a prompt will automatically set the recommended AI model for best results."
             />
             {lastUpdated && (

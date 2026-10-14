@@ -8,7 +8,7 @@ codebase or by running live API tests, except where explicitly marked unverified
 
 ## The goal
 
-In continuous listening mode, Pluely calls the LLM on **every** non-empty
+In continuous listening mode, Clocks calls the LLM on **every** non-empty
 transcript. Two consequences the user wants fixed:
 
 1. **Fragments.** The energy VAD cuts on a fixed silence count, so a mid-thought
@@ -155,7 +155,7 @@ Semantic turn detection is a mature, crowded space. Do not train anything.
 - 8MB int8 (CPU) / 32MB fp32 (GPU)
 - **23 languages incl. Hindi, Bengali, Marathi**
 - **BSD 2-clause** — weights, datasets, and training script all open.
-  Compatible with Pluely's GPL-3.0. Keep attribution in the vendored dir.
+  Compatible with Clocks's GPL-3.0. Keep attribution in the vendored dir.
 - Input contract: pad at the **front**, audio at the end of the vector. Re-run on
   the whole turn (not just new audio) if more speech arrives. Designed to run
   only during VAD silence.
@@ -254,7 +254,7 @@ phase 3 or 4 before phase 2 has produced logs.
   (`useSystemAudio.ts:198`).
 - **Surgical changes only.** Don't refactor adjacent code or "improve" the
   existing VAD beyond what the task needs.
-- **Git.** `origin` is upstream `iamsrikanthnani/pluely`, **not a personal
+- **Git.** `origin` is upstream `iamsrikanthnani/clocks`, **not a personal
   fork.** Never push to it. Commit locally only.
 
 ## Unverified / open questions

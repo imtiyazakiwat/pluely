@@ -48,7 +48,7 @@ fn get_secure_storage_path(app: &AppHandle) -> Result<PathBuf, String> {
 struct SecureStorage {
     license_key: Option<String>,
     instance_id: Option<String>,
-    selected_pluely_model: Option<String>,
+    selected_clocks_model: Option<String>,
 }
 
 pub async fn get_stored_credentials(
@@ -74,7 +74,7 @@ pub async fn get_stored_credentials(
         .ok_or("Instance ID not found".to_string())?;
 
     let selected_model: Option<Model> = storage
-        .selected_pluely_model
+        .selected_clocks_model
         .and_then(|json_str| serde_json::from_str(&json_str).ok());
 
     Ok((license_key, instance_id, selected_model))
@@ -128,9 +128,9 @@ pub struct SystemPromptResponse {
     system_prompt: String,
 }
 
-// Pluely Prompts API
+// Clocks Prompts API
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PluelyPrompt {
+pub struct ClocksPrompt {
     title: String,
     prompt: String,
     #[serde(rename = "modelId")]
@@ -140,8 +140,8 @@ pub struct PluelyPrompt {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct PluelyPromptsResponse {
-    prompts: Vec<PluelyPrompt>,
+pub struct ClocksPromptsResponse {
+    prompts: Vec<ClocksPrompt>,
     total: i32,
     #[serde(rename = "last_updated")]
     last_updated: Option<String>,
@@ -958,9 +958,9 @@ pub async fn fetch_models(app: AppHandle) -> Result<Vec<Model>, String> {
     Ok(models_response.models)
 }
 
-// Fetch Pluely Prompts API
+// Fetch Clocks Prompts API
 #[tauri::command]
-pub async fn fetch_prompts() -> Result<PluelyPromptsResponse, String> {
+pub async fn fetch_prompts() -> Result<ClocksPromptsResponse, String> {
     let app_endpoint = get_app_endpoint()?;
     let api_access_key = get_api_access_key()?;
 
@@ -1006,7 +1006,7 @@ pub async fn fetch_prompts() -> Result<PluelyPromptsResponse, String> {
         return Err(format!("Server error ({}): {}", status, error_text));
     }
 
-    let prompts_response: PluelyPromptsResponse = response
+    let prompts_response: ClocksPromptsResponse = response
         .json()
         .await
         .map_err(|e| format!("Failed to parse prompts response: {}", e))?;

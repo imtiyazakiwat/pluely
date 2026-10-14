@@ -1,2 +1,2 @@
-export * from "./PluelyApiSetup";
+export * from "./ClocksApiSetup";
 export * from "./Usage";

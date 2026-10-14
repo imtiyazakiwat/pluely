@@ -81,18 +81,18 @@ export const useMenuItems = () => {
           {
             icon: MailIcon,
             label: "Contact Support",
-            href: "mailto:support@pluely.com",
+            href: "mailto:support@clocks.com",
           },
         ]
       : []),
     {
       icon: BugIcon,
       label: "Report a bug",
-      href: "https://github.com/iamsrikanthnani/pluely/issues/new?template=bug-report.yml",
+      href: "https://github.com/iamsrikanthnani/clocks/issues/new?template=bug-report.yml",
     },
     {
       icon: PowerIcon,
-      label: "Quit pluely",
+      label: "Quit clocks",
       action: async () => {
         await invoke("exit_app");
       },
@@ -107,12 +107,12 @@ export const useMenuItems = () => {
     {
       title: "Website",
       icon: GlobeIcon,
-      link: "https://pluely.com",
+      link: "https://clocks.com",
     },
     {
       title: "Github",
       icon: GithubIcon,
-      link: "https://github.com/iamsrikanthnani/pluely",
+      link: "https://github.com/iamsrikanthnani/clocks",
     },
     {
       title: "Buy Me a Coffee",

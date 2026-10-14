@@ -7,7 +7,7 @@ import {
 } from "./components";
 import { useApp } from "@/hooks";
 import { useApp as useAppContext } from "@/contexts";
-import { SparklesIcon } from "lucide-react";
+import { ClockIcon } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorLayout } from "@/layouts";
@@ -74,7 +74,7 @@ const App = () => {
               title="Open Dev Space"
               onClick={openDashboard}
             >
-              <SparklesIcon className="h-4 w-4" />
+              <ClockIcon className="h-4 w-4" />
             </Button>
           </div>
 

@@ -33,7 +33,7 @@ interface ActivationResponse {
 interface StorageResult {
   license_key?: string;
   instance_id?: string;
-  selected_pluely_model?: string;
+  selected_clocks_model?: string;
 }
 
 interface Model {
@@ -46,14 +46,14 @@ interface Model {
   isAvailable: boolean;
 }
 
-const LICENSE_KEY_STORAGE_KEY = "pluely_license_key";
-const INSTANCE_ID_STORAGE_KEY = "pluely_instance_id";
-const SELECTED_PLUELY_MODEL_STORAGE_KEY = "selected_pluely_model";
+const LICENSE_KEY_STORAGE_KEY = "clocks_license_key";
+const INSTANCE_ID_STORAGE_KEY = "clocks_instance_id";
+const SELECTED_CLOCKS_MODEL_STORAGE_KEY = "selected_clocks_model";
 
-export const PluelyApiSetup = () => {
+export const ClocksApiSetup = () => {
   const {
-    pluelyApiEnabled,
-    setPluelyApiEnabled,
+    clocksApiEnabled,
+    setClocksApiEnabled,
     hasActiveLicense,
     setHasActiveLicense,
     getActiveLicenseStatus,
@@ -120,9 +120,9 @@ export const PluelyApiSetup = () => {
         setMaskedLicenseKey(null);
       }
 
-      if (storage.selected_pluely_model) {
+      if (storage.selected_clocks_model) {
         try {
-          const storedModel = JSON.parse(storage.selected_pluely_model);
+          const storedModel = JSON.parse(storage.selected_clocks_model);
           setSelectedModel(storedModel);
         } catch (e) {
           console.error("Failed to parse stored model:", e);
@@ -176,9 +176,9 @@ export const PluelyApiSetup = () => {
         setSuccess("License activated successfully!");
         setLicenseKey(""); // Clear the input
 
-        // Auto-enable Pluely API when license is activated
+        // Auto-enable Clocks API when license is activated
         if (!response?.is_dev_license) {
-          setPluelyApiEnabled(true);
+          setClocksApiEnabled(true);
         }
 
         await loadLicenseStatus(); // Reload status
@@ -206,14 +206,14 @@ export const PluelyApiSetup = () => {
         keys: [
           LICENSE_KEY_STORAGE_KEY,
           INSTANCE_ID_STORAGE_KEY,
-          SELECTED_PLUELY_MODEL_STORAGE_KEY,
+          SELECTED_CLOCKS_MODEL_STORAGE_KEY,
         ],
       });
 
       setSuccess("License removed successfully!");
 
-      // Disable Pluely API when license is removed
-      setPluelyApiEnabled(false);
+      // Disable Clocks API when license is removed
+      setClocksApiEnabled(false);
 
       await fetchModels();
       await loadLicenseStatus(); // Reload status
@@ -232,7 +232,7 @@ export const PluelyApiSetup = () => {
     setSearchValue(""); // Reset search when model is selected
 
     // Update supportsImages based on the selected model
-    if (pluelyApiEnabled) {
+    if (clocksApiEnabled) {
       const hasImageSupport = model.modality?.includes("image") ?? false;
       setSupportsImages(hasImageSupport);
     }
@@ -241,7 +241,7 @@ export const PluelyApiSetup = () => {
       await invoke("secure_storage_save", {
         items: [
           {
-            key: SELECTED_PLUELY_MODEL_STORAGE_KEY,
+            key: SELECTED_CLOCKS_MODEL_STORAGE_KEY,
             value: JSON.stringify(model),
           },
         ],
@@ -284,7 +284,7 @@ export const PluelyApiSetup = () => {
 
   const title = isModelsLoading
     ? "Loading Models..."
-    : `Pluely supports ${models?.length} model${
+    : `Clocks supports ${models?.length} model${
         models?.length !== 1 ? "s" : ""
       }`;
 
@@ -292,10 +292,10 @@ export const PluelyApiSetup = () => {
     ? "Fetching the list of supported models..."
     : providerList
     ? `Access top models from providers like ${providerList}. and select smaller models for faster responses.`
-    : "Explore all the models Pluely supports.";
+    : "Explore all the models Clocks supports.";
 
   return (
-    <div id="pluely-api" className="space-y-3 -mt-2">
+    <div id="clocks-api" className="space-y-3 -mt-2">
       <div className="space-y-2 pt-2">
         {/* Error Message */}
         {error && (
@@ -468,7 +468,7 @@ export const PluelyApiSetup = () => {
                 <div className="-mt-1">
                   <p className="text-sm font-medium text-muted-foreground select-auto">
                     If you need any help or any assistance, contact
-                    support@pluely.com
+                    support@clocks.com
                   </p>
                 </div>
               ) : null}
@@ -478,18 +478,18 @@ export const PluelyApiSetup = () => {
       </div>
       <div className="flex justify-between items-center">
         <Header
-          title={`${pluelyApiEnabled ? "Disable" : "Enable"} Pluely API`}
+          title={`${clocksApiEnabled ? "Disable" : "Enable"} Clocks API`}
           description={
             storedLicenseKey
-              ? pluelyApiEnabled
-                ? "Using all pluely APIs for audio, and chat."
+              ? clocksApiEnabled
+                ? "Using all clocks APIs for audio, and chat."
                 : "Using all your own AI Providers for audio, and chat."
-              : "A valid license is required to enable Pluely API or you can use your own AI Providers and STT Providers."
+              : "A valid license is required to enable Clocks API or you can use your own AI Providers and STT Providers."
           }
         />
         <Switch
-          checked={pluelyApiEnabled}
-          onCheckedChange={setPluelyApiEnabled}
+          checked={clocksApiEnabled}
+          onCheckedChange={setClocksApiEnabled}
           disabled={!storedLicenseKey || !hasActiveLicense} // Disable if no license is stored
         />
       </div>

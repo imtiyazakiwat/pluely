@@ -143,9 +143,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     safeLocalStorage.setItem(STORAGE_KEYS.SUPPORTS_IMAGES, String(value));
   };
 
-  // Pluely API State
-  const [pluelyApiEnabled, setPluelyApiEnabledState] = useState<boolean>(
-    safeLocalStorage.getItem(STORAGE_KEYS.PLUELY_API_ENABLED) === "true"
+  // Clocks API State
+  const [clocksApiEnabled, setClocksApiEnabledState] = useState<boolean>(
+    safeLocalStorage.getItem(STORAGE_KEYS.CLOCKS_API_ENABLED) === "true"
   );
 
   const getActiveLicenseStatus = async () => {
@@ -166,7 +166,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setHasActiveLicense(true);
 
     if (response?.is_dev_license) {
-      setPluelyApiEnabled(false);
+      setClocksApiEnabled(false);
     }
 
     // Check if the auto configs are enabled. Keyed on the real license status
@@ -289,12 +289,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    // Load Pluely API enabled state
-    const savedPluelyApiEnabled = safeLocalStorage.getItem(
-      STORAGE_KEYS.PLUELY_API_ENABLED
+    // Load Clocks API enabled state
+    const savedClocksApiEnabled = safeLocalStorage.getItem(
+      STORAGE_KEYS.CLOCKS_API_ENABLED
     );
-    if (savedPluelyApiEnabled !== null) {
-      setPluelyApiEnabledState(savedPluelyApiEnabled === "true");
+    if (savedClocksApiEnabled !== null) {
+      setClocksApiEnabledState(savedClocksApiEnabled === "true");
     }
 
     // Load selected audio devices
@@ -466,15 +466,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // Check if the current AI provider/model supports images
   useEffect(() => {
     const checkImageSupport = async () => {
-      if (pluelyApiEnabled) {
-        // For Pluely API, check the selected model's modality
+      if (clocksApiEnabled) {
+        // For Clocks API, check the selected model's modality
         try {
           const storage = await invoke<{
-            selected_pluely_model?: string;
+            selected_clocks_model?: string;
           }>("secure_storage_get");
 
-          if (storage.selected_pluely_model) {
-            const model = JSON.parse(storage.selected_pluely_model);
+          if (storage.selected_clocks_model) {
+            const model = JSON.parse(storage.selected_clocks_model);
             const hasImageSupport = model.modality?.includes("image") ?? false;
             setSupportsImages(hasImageSupport);
           } else {
@@ -499,7 +499,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     checkImageSupport();
-  }, [pluelyApiEnabled, selectedAIProvider.provider]);
+  }, [clocksApiEnabled, selectedAIProvider.provider]);
 
   // Sync selected AI to localStorage
   useEffect(() => {
@@ -546,7 +546,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
 
     // Update supportsImages immediately when provider changes
-    if (!pluelyApiEnabled) {
+    if (!clocksApiEnabled) {
       const selectedProvider = allAiProviders.find((p) => p.id === provider);
       if (selectedProvider) {
         const hasImageSupport =
@@ -627,18 +627,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     loadData();
   };
 
-  const setPluelyApiEnabled = async (enabled: boolean) => {
-    setPluelyApiEnabledState(enabled);
-    safeLocalStorage.setItem(STORAGE_KEYS.PLUELY_API_ENABLED, String(enabled));
+  const setClocksApiEnabled = async (enabled: boolean) => {
+    setClocksApiEnabledState(enabled);
+    safeLocalStorage.setItem(STORAGE_KEYS.CLOCKS_API_ENABLED, String(enabled));
 
     if (enabled) {
       try {
         const storage = await invoke<{
-          selected_pluely_model?: string;
+          selected_clocks_model?: string;
         }>("secure_storage_get");
 
-        if (storage.selected_pluely_model) {
-          const model = JSON.parse(storage.selected_pluely_model);
+        if (storage.selected_clocks_model) {
+          const model = JSON.parse(storage.selected_clocks_model);
           const hasImageSupport = model.modality?.includes("image") ?? false;
           setSupportsImages(hasImageSupport);
         } else {
@@ -646,7 +646,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           setSupportsImages(false);
         }
       } catch (error) {
-        console.debug("Failed to check Pluely model image support:", error);
+        console.debug("Failed to check Clocks model image support:", error);
         setSupportsImages(false);
       }
     } else {
@@ -684,8 +684,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     toggleAlwaysOnTop,
     toggleAutostart,
     loadData,
-    pluelyApiEnabled,
-    setPluelyApiEnabled,
+    clocksApiEnabled,
+    setClocksApiEnabled,
     hasActiveLicense,
     setHasActiveLicense,
     getActiveLicenseStatus,

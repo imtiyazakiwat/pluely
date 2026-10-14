@@ -2,18 +2,18 @@
  * Console surface for the ask-gate decision log.
  *
  * Phase 2's verification step is "run a real meeting, read the distribution",
- * so the log needs a way out. This attaches it to `window.pluelyGate` rather
+ * so the log needs a way out. This attaches it to `window.clocksGate` rather
  * than building UI — settings UI is Phase 4, and a devtools handle is enough to
  * read a distribution and export it for tuning.
  *
- * Open devtools in the Pluely window and run:
+ * Open devtools in the Clocks window and run:
  *
- *   pluelyGate.report()     // distribution, formatted
- *   pluelyGate.table()      // every decision as a console table
- *   pluelyGate.gated()      // only what the gate stopped
- *   pluelyGate.copyCsv()    // CSV to clipboard for offline analysis
- *   pluelyGate.clear()      // wipe stored transcripts
- *   pluelyGate.settings({ storeTranscripts: false })
+ *   clocksGate.report()     // distribution, formatted
+ *   clocksGate.table()      // every decision as a console table
+ *   clocksGate.gated()      // only what the gate stopped
+ *   clocksGate.copyCsv()    // CSV to clipboard for offline analysis
+ *   clocksGate.clear()      // wipe stored transcripts
+ *   clocksGate.settings({ storeTranscripts: false })
  */
 
 import {
@@ -55,10 +55,10 @@ export interface GateDebugApi {
 
 declare global {
   // eslint-disable-next-line no-var
-  var pluelyGate: GateDebugApi | undefined;
+  var clocksGate: GateDebugApi | undefined;
 
   interface Window {
-    pluelyGate?: GateDebugApi;
+    clocksGate?: GateDebugApi;
   }
 }
 
@@ -104,5 +104,5 @@ export function createGateDebugApi(): GateDebugApi {
 }
 
 if (typeof window !== "undefined") {
-  window.pluelyGate = createGateDebugApi();
+  window.clocksGate = createGateDebugApi();
 }

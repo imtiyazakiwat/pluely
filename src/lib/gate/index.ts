@@ -20,7 +20,7 @@ import type { GateMode } from "./backchannel.ts";
 export * from "./backchannel.ts";
 export * from "./log.ts";
 
-// Registers the `window.pluelyGate` console helpers. Side-effect import; no-op
+// Registers the `window.clocksGate` console helpers. Side-effect import; no-op
 // outside a browser.
 import "./debug.ts";
 
