@@ -14,6 +14,11 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+# On-device STT engine. Kept as its own crate so its benchmark
+# (`cargo run -p clocks-local-stt --release --example bench`) builds without Tauri.
+members = ["local-stt"]
+
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
@@ -25,7 +30,17 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 dotenv = "0.15"
 
+[features]
+default = ["local-stt"]
+# On-device speech-to-text (beta, issue #1). The engine crate downloads
+# prebuilt sherpa-onnx + ONNX Runtime static libraries at build time; build
+# with `--no-default-features` to leave it out (the commands then report it as
+# unavailable and capture falls back to the STT provider).
+local-stt = ["dep:clocks-local-stt", "dep:sha2"]
+
 [dependencies]
+clocks-local-stt = { path = "local-stt", optional = true }
+sha2 = { version = "0.10.9", optional = true }
 tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-opener = "2"
 tauri-plugin-updater = "2.9.0"

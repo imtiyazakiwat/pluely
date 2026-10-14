@@ -9,6 +9,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { TYPE_PROVIDER } from "@/types";
 import curl2Json from "@bany/curl-to-json";
 import { shouldUseClocksAPI } from "./clocks.api";
+import { isLocalSttEnabled, transcribeLocally } from "./local-stt.function";
 
 // Clocks STT function
 async function fetchClocksSTT(audio: File | Blob): Promise<string> {
@@ -53,6 +54,20 @@ export async function fetchSTT(params: STTParams): Promise<string> {
 
   try {
     const { provider, selectedProvider, audio } = params;
+
+    // On-device recognition first when the user turned it on; the configured
+    // provider (or Clocks API) is the fallback.
+    if (isLocalSttEnabled()) {
+      try {
+        return await transcribeLocally(audio);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        console.warn("On-device speech recognition failed, using the provider:", reason);
+        if (!provider && !(await shouldUseClocksAPI())) {
+          throw new Error(`On-device speech recognition failed: ${reason}`);
+        }
+      }
+    }
 
     // Check if we should use Clocks API instead
     const useClocksAPI = await shouldUseClocksAPI();

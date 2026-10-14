@@ -3,6 +3,7 @@ mod activate;
 mod api;
 mod capture;
 mod db;
+mod local_stt;
 mod shortcuts;
 mod window;
 use std::sync::{Arc, Mutex};
@@ -40,6 +41,7 @@ pub fn run() {
                 .build(),
         )
         .manage(AudioState::default())
+        .manage(local_stt::LocalSttState::default())
         .manage(CaptureState::default())
         .manage(shortcuts::WindowVisibility {
             is_hidden: Mutex::new(false),
@@ -115,6 +117,10 @@ pub fn run() {
             speaker::get_audio_sample_rate,
             speaker::get_input_devices,
             speaker::get_output_devices,
+            local_stt::local_stt_status,
+            local_stt::local_stt_download,
+            local_stt::local_stt_delete,
+            local_stt::local_stt_transcribe,
         ])
         .setup(|app| {
             // Setup main window positioning

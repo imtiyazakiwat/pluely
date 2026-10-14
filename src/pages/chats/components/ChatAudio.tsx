@@ -1,6 +1,7 @@
 import { InfoIcon, MicIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger, Button } from "@/components";
 import { useApp } from "@/contexts";
+import { useLocalSttEnabled } from "@/hooks/useLocalStt";
 
 interface ChatAudioProps {
   micOpen: boolean;
@@ -18,7 +19,9 @@ export const ChatAudio = ({
   disabled,
 }: ChatAudioProps) => {
   const { selectedSttProvider, clocksApiEnabled } = useApp();
-  const isProviderConfigured = clocksApiEnabled || selectedSttProvider.provider;
+  const localSttEnabled = useLocalSttEnabled();
+  const isProviderConfigured =
+    clocksApiEnabled || selectedSttProvider.provider || localSttEnabled;
 
   const handleMicClick = () => {
     if (!isProviderConfigured) {

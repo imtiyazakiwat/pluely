@@ -3,6 +3,7 @@ import { Popover, PopoverContent, PopoverTrigger, Button } from "@/components";
 import { AutoSpeechVAD } from "./AutoSpeechVad";
 import { UseCompletionReturn } from "@/types";
 import { useApp } from "@/contexts";
+import { useLocalSttEnabled } from "@/hooks/useLocalStt";
 
 export const Audio = ({
   micOpen,
@@ -15,7 +16,9 @@ export const Audio = ({
   const { selectedSttProvider, clocksApiEnabled, selectedAudioDevices } =
     useApp();
 
-  const speechProviderStatus = selectedSttProvider.provider;
+  const localSttEnabled = useLocalSttEnabled();
+  // On-device recognition counts as a configured speech provider.
+  const speechProviderStatus = selectedSttProvider.provider || localSttEnabled;
 
   return (
     <Popover open={micOpen} onOpenChange={setMicOpen}>

@@ -4,6 +4,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useApp } from "@/contexts";
 import { fetchSTT, fetchAIResponse } from "@/lib/functions";
+import {
+  LOCAL_STT_EVENTS,
+  LocalSttTurn,
+  isLocalSttEnabled,
+} from "@/lib/functions/local-stt.function";
 import { shouldAsk, logGateDecision } from "@/lib/gate";
 import {
   DEFAULT_QUICK_ACTIONS,
@@ -164,6 +169,7 @@ export function useSystemAudio() {
     let stopUnlisten: (() => void) | undefined;
     let errorUnlisten: (() => void) | undefined;
     let discardedUnlisten: (() => void) | undefined;
+    let fallbackUnlisten: (() => void) | undefined;
 
     const setupContinuousListeners = async () => {
       try {
@@ -201,6 +207,15 @@ export function useSystemAudio() {
           console.log("Speech discarded:", reason);
           // Don't show error - this is expected behavior
         });
+
+        // On-device STT could not start; capture carries on through the STT
+        // provider, and fetchSTT reports it if there is no provider either.
+        fallbackUnlisten = await listen<string>(
+          LOCAL_STT_EVENTS.FALLBACK,
+          (event) => {
+            console.warn("On-device speech recognition unavailable:", event.payload);
+          }
+        );
       } catch (err) {
         console.error("Failed to setup continuous recording listeners:", err);
       }
@@ -214,12 +229,61 @@ export function useSystemAudio() {
       if (stopUnlisten) stopUnlisten();
       if (errorUnlisten) errorUnlisten();
       if (discardedUnlisten) discardedUnlisten();
+      if (fallbackUnlisten) fallbackUnlisten();
     };
   }, []);
 
   // Handle single speech detection event (both VAD and continuous modes)
   useEffect(() => {
     let speechUnlisten: (() => void) | undefined;
+    let transcribedUnlisten: (() => void) | undefined;
+
+    // Gate a transcript and, if it is a real request, send it to the AI.
+    // Shared by the STT-provider path and on-device recognition.
+    const respondToTranscript = async (transcription: string) => {
+      // Ask-gate (layer 1): drop backchannels before they cost an LLM
+      // call. `isContinuousMode` is the MANUAL press-to-record mode
+      // (vadConfig.enabled === false), so the hands-free auto-detect
+      // mode is the one that needs the strict gate.
+      const gateInput = {
+        transcript: transcription,
+        mode: isContinuousMode
+          ? ("explicit" as const)
+          : ("continuous" as const),
+      };
+      const gate = shouldAsk(gateInput);
+      // Phase 2: every decision, asked or gated, goes in the log so
+      // the distribution can be read before any threshold is tuned.
+      logGateDecision(gate, gateInput);
+
+      if (gate.ask) {
+        setLastTranscription(transcription);
+        setError("");
+
+        const effectiveSystemPrompt = useSystemPrompt
+          ? systemPrompt || DEFAULT_SYSTEM_PROMPT
+          : contextContent || DEFAULT_SYSTEM_PROMPT;
+
+        const previousMessages = conversation.messages.map((msg) => {
+          return { role: msg.role, content: msg.content };
+        });
+
+        await processWithAI(
+          transcription,
+          effectiveSystemPrompt,
+          previousMessages
+        );
+      } else if (gate.reason === "empty") {
+        setError("Received empty transcription");
+      } else {
+        // Mirrors the `speech-discarded` listener above: expected
+        // behaviour, so log it rather than raising an error, but show
+        // what was heard so a wrongly-gated question is visible.
+        console.log("Ask gated:", gate.reason, transcription);
+        setLastTranscription(gate.status);
+        setError("");
+      }
+    };
 
     const setupEventListener = async () => {
       try {
@@ -237,7 +301,9 @@ export function useSystemAudio() {
             const audioBlob = new Blob([bytes], { type: "audio/wav" });
 
             const useClocksAPI = await shouldUseClocksAPI();
-            if (!selectedSttProvider.provider && !useClocksAPI) {
+            // fetchSTT transcribes on-device first when this is on.
+            const useLocalStt = isLocalSttEnabled();
+            if (!selectedSttProvider.provider && !useClocksAPI && !useLocalStt) {
               setError("No speech provider selected.");
               return;
             }
@@ -246,7 +312,7 @@ export function useSystemAudio() {
               (p) => p.id === selectedSttProvider.provider
             );
 
-            if (!providerConfig && !useClocksAPI) {
+            if (!providerConfig && !useClocksAPI && !useLocalStt) {
               setError("Speech provider config not found.");
               return;
             }
@@ -273,48 +339,7 @@ export function useSystemAudio() {
                 timeoutPromise,
               ]);
 
-              // Ask-gate (layer 1): drop backchannels before they cost an LLM
-              // call. `isContinuousMode` is the MANUAL press-to-record mode
-              // (vadConfig.enabled === false), so the hands-free auto-detect
-              // mode is the one that needs the strict gate.
-              const gateInput = {
-                transcript: transcription,
-                mode: isContinuousMode
-                  ? ("explicit" as const)
-                  : ("continuous" as const),
-              };
-              const gate = shouldAsk(gateInput);
-              // Phase 2: every decision, asked or gated, goes in the log so
-              // the distribution can be read before any threshold is tuned.
-              logGateDecision(gate, gateInput);
-
-              if (gate.ask) {
-                setLastTranscription(transcription);
-                setError("");
-
-                const effectiveSystemPrompt = useSystemPrompt
-                  ? systemPrompt || DEFAULT_SYSTEM_PROMPT
-                  : contextContent || DEFAULT_SYSTEM_PROMPT;
-
-                const previousMessages = conversation.messages.map((msg) => {
-                  return { role: msg.role, content: msg.content };
-                });
-
-                await processWithAI(
-                  transcription,
-                  effectiveSystemPrompt,
-                  previousMessages
-                );
-              } else if (gate.reason === "empty") {
-                setError("Received empty transcription");
-              } else {
-                // Mirrors the `speech-discarded` listener above: expected
-                // behaviour, so log it rather than raising an error, but show
-                // what was heard so a wrongly-gated question is visible.
-                console.log("Ask gated:", gate.reason, transcription);
-                setLastTranscription(gate.status);
-                setError("");
-              }
+              await respondToTranscript(transcription);
             } catch (sttError: any) {
               console.error("STT Error:", sttError);
               setError(sttError.message || "Failed to transcribe audio");
@@ -326,6 +351,25 @@ export function useSystemAudio() {
             setIsProcessing(false);
           }
         });
+
+        // On-device recognition: Rust already turned the audio into a
+        // finished turn, so there is no STT request; go straight to the gate.
+        transcribedUnlisten = await listen<LocalSttTurn>(
+          LOCAL_STT_EVENTS.TRANSCRIBED,
+          async (event) => {
+            if (!capturing) return;
+            const turn = event.payload;
+            console.debug(
+              `[local-stt] ${turn.end} p=${turn.probability ?? "-"} ` +
+                `decision=${turn.decision_ms.toFixed(0)}ms`
+            );
+            try {
+              await respondToTranscript(turn.text);
+            } catch {
+              setError("Failed to process speech");
+            }
+          }
+        );
       } catch (err) {
         setError("Failed to setup speech listener");
       }
@@ -335,6 +379,7 @@ export function useSystemAudio() {
 
     return () => {
       if (speechUnlisten) speechUnlisten();
+      if (transcribedUnlisten) transcribedUnlisten();
     };
   }, [
     capturing,
@@ -469,6 +514,7 @@ export function useSystemAudio() {
       await invoke<string>("start_system_audio_capture", {
         vadConfig: vadConfig,
         deviceId: deviceId,
+        localStt: { enabled: isLocalSttEnabled() },
       });
     } catch (err) {
       console.error("Failed to start continuous recording:", err);
@@ -620,10 +666,12 @@ export function useSystemAudio() {
           ? selectedAudioDevices.output.id
           : null;
 
-      // Start capture with VAD config
+      // Start capture with VAD config. With on-device STT on, Rust runs
+      // Silero VAD + Zipformer + Smart Turn and emits `speech-transcribed`.
       await invoke<string>("start_system_audio_capture", {
         vadConfig: vadConfig,
         deviceId: deviceId,
+        localStt: { enabled: isLocalSttEnabled() },
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);

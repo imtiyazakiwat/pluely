@@ -44,11 +44,19 @@ impl Default for VadConfig {
     }
 }
 
+/// Sent by the frontend when the user turned on on-device speech recognition.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct LocalSttOptions {
+    #[serde(default)]
+    pub enabled: bool,
+}
+
 #[tauri::command]
 pub async fn start_system_audio_capture(
     app: AppHandle,
     vad_config: Option<VadConfig>,
     device_id: Option<String>,
+    local_stt: Option<LocalSttOptions>,
 ) -> Result<(), String> {
     let state = app.state::<crate::AudioState>();
 
@@ -74,6 +82,27 @@ pub async fn start_system_audio_capture(
         *vad_cfg = config;
     }
 
+    // On-device STT replaces the energy VAD + STT round trip in auto-detect
+    // mode. Load it before opening the device; any problem falls back to the
+    // existing path and tells the frontend why.
+    let vad_enabled = state
+        .vad_config
+        .lock()
+        .map_err(|e| format!("Failed to read VAD config: {}", e))?
+        .enabled;
+    let local_engine = if vad_enabled && local_stt.is_some_and(|o| o.enabled) {
+        match crate::local_stt::engine(&app).await {
+            Ok(engine) => Some(engine),
+            Err(reason) => {
+                warn!("On-device STT unavailable, using the STT provider: {}", reason);
+                let _ = app.emit("local-stt-fallback", reason);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     let input = SpeakerInput::new_with_device(device_id).map_err(|e| {
         error!("Failed to create speaker input: {}", e);
         format!("Failed to access system audio: {}", e)
@@ -98,6 +127,16 @@ pub async fn start_system_audio_capture(
         .map_err(|e| format!("Failed to read VAD config: {}", e))?
         .clone();
 
+    let local_session = match local_engine.map(|engine| super::local::prepare(engine, sr)) {
+        Some(Ok(session)) => Some(session),
+        Some(Err(reason)) => {
+            warn!("On-device STT unavailable, using the STT provider: {}", reason);
+            let _ = app.emit("local-stt-fallback", reason);
+            None
+        }
+        None => None,
+    };
+
     // Mark as capturing BEFORE spawning task
     *state
         .is_capturing
@@ -109,7 +148,9 @@ pub async fn start_system_audio_capture(
 
     let state_clone = app.state::<crate::AudioState>();
     let task = tokio::spawn(async move {
-        if vad_config.enabled {
+        if let Some(session) = local_session {
+            super::local::run_local_capture(app_clone.clone(), stream, session).await;
+        } else if vad_config.enabled {
             run_vad_capture(app_clone.clone(), stream, sr, vad_config).await;
         } else {
             run_continuous_capture(app_clone.clone(), stream, sr, vad_config).await;
