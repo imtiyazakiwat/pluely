@@ -71,10 +71,7 @@ const AppContext = createContext<IContextType | undefined>(undefined);
 
 // Create the provider component
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [systemPrompt, setSystemPrompt] = useState<string>(
-    safeLocalStorage.getItem(STORAGE_KEYS.SYSTEM_PROMPT) ||
-      DEFAULT_SYSTEM_PROMPT
-  );
+  const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT);
 
   const [selectedAudioDevices, setSelectedAudioDevices] = useState<{
     input: { id: string; name: string };
@@ -203,13 +200,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // Function to load AI, STT, system prompt and screenshot config data from storage
   const loadData = () => {
-    // Load system prompt
-    const savedSystemPrompt = safeLocalStorage.getItem(
-      STORAGE_KEYS.SYSTEM_PROMPT
-    );
-    if (savedSystemPrompt) {
-      setSystemPrompt(savedSystemPrompt || DEFAULT_SYSTEM_PROMPT);
-    }
+    // On this branch the ETL interview system prompt is always the active default.
+    // We forcefully write it to storage so every window and reload picks it up,
+    // overriding anything previously saved by the user.
+    safeLocalStorage.setItem(STORAGE_KEYS.SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT);
+    setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
 
     // Load screenshot configuration
     const savedScreenshotConfig = safeLocalStorage.getItem(
