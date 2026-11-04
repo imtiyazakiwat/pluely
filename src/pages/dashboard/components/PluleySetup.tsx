@@ -11,7 +11,7 @@ import {
 import { safeLocalStorage } from "@/lib";
 import { STORAGE_KEYS } from "@/config";
 
-const PLUELY_DEFAULT_MODEL = "gemini-2.0-flash";
+const PLUELY_DEFAULT_MODEL = "gemini-3.5-flash-lite";
 
 /**
  * PluleySetup — first-run onboarding card.
