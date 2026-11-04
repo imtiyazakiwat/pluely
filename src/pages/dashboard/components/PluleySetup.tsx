@@ -25,8 +25,7 @@ const PLUELY_DEFAULT_MODEL = "gemini-3.5-flash-lite";
  * so speech recognition is ready by the time the user opens the mic.
  */
 export const PluleySetup = () => {
-  const { selectedAIProvider, onSetSelectedAIProvider, allAiProviders } =
-    useApp();
+  const { selectedAIProvider, onSetSelectedAIProvider } = useApp();
 
   const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
