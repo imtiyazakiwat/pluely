@@ -18,7 +18,7 @@
         "height": 54,
         "decorations": false,
         "transparent": true,
-        "alwaysOnTop": false,
+        "alwaysOnTop": true,
         "resizable": false,
         "visibleOnAllWorkspaces": true,
         "skipTaskbar": true,
